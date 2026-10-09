@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="TaskFlow – a fast, offline-friendly task manager built with vanilla JavaScript.">
+  <meta name="color-scheme" content="light dark">
+  <script>
+    /* Apply saved theme before first paint to avoid a light-mode flash */
+    try {
+      var t = localStorage.getItem("taskflow.theme");
+      if (t !== "dark" && t !== "light") t = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      document.documentElement.dataset.theme = t;
+    } catch (e) {}
+  </script>
+  <title>TaskFlow – Smart Task Manager</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="app">
+    <header class="header">
+      <div class="brand">
+        <span class="logo" aria-hidden="true">✓</span>
+        <div>
+          <h1>TaskFlow</h1>
+          <p id="todayLabel"></p>
+        </div>
+      </div>
+      <button id="themeBtn" type="button" class="icon-btn" aria-label="Switch to dark theme">🌙</button>
+    </header>
+
+    <div class="layout">
+    <aside class="sidebar card" aria-label="Lists">
+      <h2 class="side-title">Lists</h2>
+      <nav id="sideNav" class="side-nav"></nav>
+    </aside>
+    <div class="content">
+    <section class="progress-card" aria-label="Progress">
+      <div class="progress-top">
+        <span id="progressText">Completed 0 of 0 tasks</span>
+        <strong id="progressPct">0%</strong>
+      </div>
+      <div class="bar"><div id="barFill" class="bar-fill"></div></div>
+      <div class="stats">
+        <div class="stat"><b id="stTotal">0</b><span>Total</span></div>
+        <div class="stat"><b id="stActive">0</b><span>Active</span></div>
+        <div class="stat"><b id="stDone">0</b><span>Done</span></div>
+        <div class="stat"><b id="stOver">0</b><span>Overdue</span></div>
+        <div class="stat"><b id="stHigh">0</b><span>High</span></div>
+      </div>
+    </section>
+
+    <form id="quickForm" class="card quick" novalidate>
+      <label class="sr-only" for="quick">Quick add</label>
+      <input id="quick" type="text" maxlength="160" autocomplete="off" placeholder="Quick add: Buy milk tomorrow 5pm !high #home @Shopping every week">
+      <button type="submit" class="btn primary">Add</button>
+    </form>
+
+    <form id="taskForm" class="card form" novalidate>
+      <h2 id="formTitle">Add a new task</h2>
+      <label class="field">
+        <span>Title *</span>
+        <input id="title" type="text" maxlength="80" placeholder="What needs to be done?" autocomplete="off" aria-describedby="titleError">
+        <small id="titleError" class="error" role="alert" hidden>Please enter a task title.</small>
+      </label>
+      <label class="field">
+        <span>Description</span>
+        <textarea id="desc" rows="2" maxlength="300" placeholder="Optional details..."></textarea>
+      </label>
+      <div class="grid">
+        <label class="field"><span>Priority</span>
+          <select id="priority">
+            <option value="low">Low</option>
+            <option value="medium" selected>Medium</option>
+            <option value="high">High</option>
+          </select>
+        </label>
+        <label class="field"><span>Category</span>
+          <select id="category"></select>
+        </label>
+        <label class="field"><span>Due date</span>
+          <input id="dueDate" type="date">
+        </label>
+        <label class="field"><span>Tags (comma or space separated)</span>
+          <input id="tags" type="text" placeholder="html css javascript" autocomplete="off">
+        </label>
+        <label class="field"><span>Time (reminder)</span>
+          <input id="dueTime" type="time">
+        </label>
+        <label class="field"><span>Repeat</span>
+          <select id="repeat">
+            <option value="none">Does not repeat</option>
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option>
+          </select>
+        </label>
+      </div>
+      <label class="field">
+        <span>Subtasks (one per line)</span>
+        <textarea id="subtasks" rows="3" placeholder="Step 1&#10;Step 2"></textarea>
+      </label>
+      <details class="manage">
+        <summary>Manage categories</summary>
+        <div class="manage-body">
+          <div class="cat-add">
+            <label class="sr-only" for="catInput">New category name</label>
+            <input id="catInput" type="text" maxlength="20" placeholder="New category name" autocomplete="off">
+            <button type="button" id="catAddBtn" class="btn">Add</button>
+          </div>
+          <small id="catError" class="error" role="alert" hidden></small>
+          <ul id="catList" class="cat-list" aria-label="Categories"></ul>
+          <p id="catEmpty" class="hint">No categories yet. Tasks will use "Other".</p>
+        </div>
+      </details>
+      <div class="form-actions">
+        <button type="submit" id="submitBtn" class="btn primary">Add Task</button>
+        <button type="button" id="cancelBtn" class="btn" hidden>Cancel</button>
+      </div>
+    </form>
+
+    <section class="card controls">
+      <input id="search" type="search" placeholder="🔍 Search title, description, category, tags..." aria-label="Search tasks">
+      <div class="filters" id="filters" role="group" aria-label="Filter tasks"></div>
+      <div class="row">
+        <label class="inline">Sort
+          <select id="sort">
+            <option value="newest">Newest first</option>
+            <option value="oldest">Oldest first</option>
+            <option value="due">Due date</option>
+            <option value="priority">Priority</option>
+            <option value="alpha">Alphabetical</option>
+            <option value="manual">Manual (drag)</option>
+          </select>
+        </label>
+        <button id="calToggle" type="button" class="btn" aria-pressed="false" aria-controls="calendar">Calendar</button>
+        <button id="clearDone" type="button" class="btn danger-outline">Clear completed</button>
+      </div>
+    </section>
+
+    <section id="calendar" class="card calendar" aria-label="Calendar" hidden>
+      <div class="cal-head">
+        <button type="button" id="calPrev" class="icon-act" aria-label="Previous month">‹</button>
+        <strong id="calTitle"></strong>
+        <button type="button" id="calNext" class="icon-act" aria-label="Next month">›</button>
+      </div>
+      <div id="calGrid" class="cal-grid"></div>
+      <p id="calNote" class="hint">Tap a day to see its tasks.</p>
+    </section>
+    <p id="status" class="sr-only" role="status"></p>
+    <ul id="taskList" class="task-list"></ul>
+    <div id="empty" class="empty" hidden>
+      <div class="empty-icon" id="emptyIcon" aria-hidden="true"></div>
+      <h3 id="emptyTitle">No tasks yet</h3>
+      <p id="emptyText">Add your first task above to get started.</p>
+    </div>
+
+    </div>
+    </div>
+
+    <footer class="footer">TaskFlow • Built with HTML, CSS &amp; Vanilla JavaScript</footer>
+  </main>
+
+  <div id="toasts" class="toasts" role="status" aria-live="polite"></div>
+
+  <div id="modal" class="modal" hidden>
+    <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="modalTitle" aria-describedby="modalText">
+      <h3 id="modalTitle">Are you sure?</h3>
+      <p id="modalText"></p>
+      <div class="modal-actions">
+        <button id="modalCancel" class="btn">Cancel</button>
+        <button id="modalOk" class="btn danger">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
